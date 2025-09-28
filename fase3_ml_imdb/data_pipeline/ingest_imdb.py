@@ -14,7 +14,7 @@ from typing import List, Dict, Optional
 import logging
 from datetime import datetime
 import json
-from io import StringIO
+from io import StringIO, BytesIO
 
 logger = logging.getLogger(__name__)
 
@@ -219,9 +219,9 @@ class IMDbIngester:
     def _save_parquet_to_s3(self, df: pd.DataFrame, bucket: str, key: str):
         """Salva DataFrame como Parquet no S3"""
         # Converte DataFrame para Parquet em memória
-        parquet_buffer = StringIO()
+        parquet_buffer = BytesIO()
         df.to_parquet(parquet_buffer, index=False)
-        parquet_data = parquet_buffer.getvalue().encode('utf-8')
+        parquet_data = parquet_buffer.getvalue()
         
         # Upload para S3
         self.s3_client.put_object(
