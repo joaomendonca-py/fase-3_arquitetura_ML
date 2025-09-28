@@ -226,18 +226,7 @@ async def bulk_movie_lookup(movie_ids: List[str]):
 # === STARTUP EVENTS ===
 
 
-@app.on_event("startup")
-async def startup_event():
-    """Inicialização da API"""
-    logger.info("🚀 Iniciando IMDb Data Collector API")
-    logger.info(f"Environment: {os.getenv('TC_STAGE', 'dev')}")
-    logger.info(f"AWS Region: {os.getenv('TC_REGION', 'us-east-1')}")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Finalização da API"""
-    logger.info("🔄 Finalizando IMDb Data Collector API")
+# Remover on_event deprecated, usar lifespan
 
 
 if __name__ == "__main__":

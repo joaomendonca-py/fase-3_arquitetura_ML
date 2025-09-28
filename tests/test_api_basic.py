@@ -41,8 +41,10 @@ def test_status_endpoint():
         response = client.get("/v1/imdb/status")
         assert response.status_code == 200
         data = response.json()
-        assert "buckets" in data
-        assert "environment" in data
+        assert "status" in data
+        assert "last_update" in data
+        assert "records_available" in data
+        assert data["status"] == "ready"
 
 
 class TestAPIStructure:
