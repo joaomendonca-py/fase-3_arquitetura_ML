@@ -1,0 +1,248 @@
+# CloudFormation Template - Glue Jobs & Catalog
+# Tech Challenge Fase 3 - Deploy via AWS CLI
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IMDb ML API - Glue Jobs e Catalog para Tech Challenge Fase 3'
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    Description: Environment stage
+  
+  S3BucketRaw:
+    Type: String
+    Default: imdb-raw-data-718942601863
+    Description: S3 bucket for raw data
+    
+  S3BucketTrusted:
+    Type: String
+    Default: imdb-trusted-data-718942601863  
+    Description: S3 bucket for trusted data
+    
+  S3BucketRefined:
+    Type: String
+    Default: imdb-refined-data-718942601863
+    Description: S3 bucket for refined data
+
+Resources:
+  # IAM Role para Glue Jobs
+  GlueServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'imdb-glue-role-${Stage}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: S3FullAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3BucketRaw}'
+                  - !Sub 'arn:aws:s3:::${S3BucketRaw}/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketTrusted}'
+                  - !Sub 'arn:aws:s3:::${S3BucketTrusted}/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketRefined}'
+                  - !Sub 'arn:aws:s3:::${S3BucketRefined}/*'
+
+  # Glue Database
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref 'AWS::AccountId'
+      DatabaseInput:
+        Name: !Sub 'imdb_database_${Stage}'
+        Description: 'IMDb database para Tech Challenge Fase 3'
+
+  # Glue Job - IMDb Ratings ETL
+  IMDbRatingsETLJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub 'imdb-ratings-etl-job-${Stage}'
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub 's3://${S3BucketRaw}/glue-scripts/imdb_ratings_etl_job.py'
+        PythonVersion: '3'
+      DefaultArguments:
+        '--job-bookmark-option': 'job-bookmark-enable'
+        '--enable-metrics': ''
+        '--enable-continuous-cloudwatch-log': ''
+        '--source-bucket': !Ref S3BucketRaw
+        '--target-bucket-trusted': !Ref S3BucketTrusted
+        '--target-bucket-refined': !Ref S3BucketRefined
+        '--database-name': !Ref GlueDatabase
+      MaxRetries: 0
+      GlueVersion: '4.0'
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      Timeout: 60
+      Description: 'ETL job for IMDb ratings data processing'
+
+  # Glue Job - IMDb Basics ETL  
+  IMDbBasicsETLJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub 'imdb-basics-etl-job-${Stage}'
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub 's3://${S3BucketRaw}/glue-scripts/imdb_basics_etl_job.py'
+        PythonVersion: '3'
+      DefaultArguments:
+        '--job-bookmark-option': 'job-bookmark-enable'
+        '--enable-metrics': ''
+        '--enable-continuous-cloudwatch-log': ''
+        '--source-bucket': !Ref S3BucketRaw
+        '--target-bucket-trusted': !Ref S3BucketTrusted
+        '--target-bucket-refined': !Ref S3BucketRefined
+        '--database-name': !Ref GlueDatabase
+      MaxRetries: 0
+      GlueVersion: '4.0'
+      WorkerType: G.1X
+      NumberOfWorkers: 4
+      Timeout: 120
+      Description: 'ETL job for IMDb basics data processing'
+
+  # Glue Crawler para catalogar dados Trusted
+  TrustedDataCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub 'imdb-trusted-crawler-${Stage}'
+      Role: !GetAtt GlueServiceRole.Arn
+      DatabaseName: !Ref GlueDatabase
+      Description: 'Crawler for trusted IMDb data'
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://${S3BucketTrusted}/imdb/'
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: LOG
+      Schedule:
+        ScheduleExpression: 'cron(0 2 * * ? *)'  # Daily at 2 AM
+
+  # Glue Crawler para catalogar dados Refined
+  RefinedDataCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub 'imdb-refined-crawler-${Stage}'
+      Role: !GetAtt GlueServiceRole.Arn
+      DatabaseName: !Ref GlueDatabase
+      Description: 'Crawler for refined IMDb data'
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://${S3BucketRefined}/imdb/'
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: LOG
+      Schedule:
+        ScheduleExpression: 'cron(0 3 * * ? *)'  # Daily at 3 AM
+
+  # Glue Table - Ratings Trusted (exemplo manual)
+  RatingsTrustedTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref 'AWS::AccountId'
+      DatabaseName: !Ref GlueDatabase
+      TableInput:
+        Name: 'imdb_ratings_trusted'
+        Description: 'IMDb ratings trusted data'
+        TableType: EXTERNAL_TABLE
+        StorageDescriptor:
+          Columns:
+            - Name: tconst
+              Type: string
+            - Name: averageRating
+              Type: double
+            - Name: numVotes  
+              Type: int
+            - Name: ingestion_timestamp
+              Type: timestamp
+          Location: !Sub 's3://${S3BucketTrusted}/imdb/ratings/'
+          InputFormat: 'org.apache.hadoop.mapred.TextInputFormat'
+          OutputFormat: 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+          SerdeInfo:
+            SerializationLibrary: 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe'
+        PartitionKeys:
+          - Name: ingestion_year
+            Type: int
+          - Name: ingestion_month
+            Type: int
+          - Name: ingestion_day
+            Type: int
+
+  # Glue Table - Ratings Refined (com features ML)
+  RatingsRefinedTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref 'AWS::AccountId'
+      DatabaseName: !Ref GlueDatabase
+      TableInput:
+        Name: 'imdb_ratings_refined'
+        Description: 'IMDb ratings refined data with ML features'
+        TableType: EXTERNAL_TABLE
+        StorageDescriptor:
+          Columns:
+            - Name: tconst
+              Type: string
+            - Name: averageRating
+              Type: double
+            - Name: numVotes
+              Type: int
+            - Name: log_votes
+              Type: double
+            - Name: rating_normalized
+              Type: double
+            - Name: rating_category
+              Type: string
+            - Name: is_popular
+              Type: int
+            - Name: ingestion_timestamp
+              Type: timestamp
+          Location: !Sub 's3://${S3BucketRefined}/imdb/ratings/'
+          InputFormat: 'org.apache.hadoop.mapred.TextInputFormat'
+          OutputFormat: 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
+          SerdeInfo:
+            SerializationLibrary: 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe'
+        PartitionKeys:
+          - Name: ingestion_year
+            Type: int
+          - Name: ingestion_month
+            Type: int
+          - Name: ingestion_day
+            Type: int
+
+Outputs:
+  GlueDatabaseName:
+    Description: 'Glue database name'
+    Value: !Ref GlueDatabase
+    Export:
+      Name: !Sub '${AWS::StackName}-database-name'
+      
+  GlueJobNames:
+    Description: 'Glue job names'
+    Value: !Sub |
+      Ratings ETL: ${IMDbRatingsETLJob}
+      Basics ETL: ${IMDbBasicsETLJob}
+    Export:
+      Name: !Sub '${AWS::StackName}-job-names'
+      
+  GlueServiceRoleArn:
+    Description: 'Glue service role ARN'
+    Value: !GetAtt GlueServiceRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-glue-role-arn'

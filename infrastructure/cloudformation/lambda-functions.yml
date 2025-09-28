@@ -1,0 +1,236 @@
+# CloudFormation Template - Lambda Functions
+# Tech Challenge Fase 3 - Deploy via AWS CLI
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IMDb ML API - Lambda Functions para Tech Challenge Fase 3'
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    Description: Environment stage
+  
+  S3BucketRaw:
+    Type: String
+    Default: imdb-raw-data-718942601863
+    Description: S3 bucket for raw data
+  
+  S3BucketTrusted:
+    Type: String  
+    Default: imdb-trusted-data-718942601863
+    Description: S3 bucket for trusted data
+  
+  S3BucketRefined:
+    Type: String
+    Default: imdb-refined-data-718942601863
+    Description: S3 bucket for refined data
+    
+  S3BucketModels:
+    Type: String
+    Default: imdb-ml-models-718942601863
+    Description: S3 bucket for ML models
+
+Resources:
+  # IAM Role para Lambda Functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'imdb-lambda-role-${Stage}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3BucketRaw}/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketTrusted}/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketRefined}/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketModels}/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketRaw}'
+                  - !Sub 'arn:aws:s3:::${S3BucketTrusted}'
+                  - !Sub 'arn:aws:s3:::${S3BucketRefined}'
+                  - !Sub 'arn:aws:s3:::${S3BucketModels}'
+        - PolicyName: GlueAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - glue:StartJobRun
+                  - glue:GetJobRun
+                  - glue:GetJobRuns
+                Resource: '*'
+        - PolicyName: AthenaAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - athena:StartQueryExecution
+                  - athena:GetQueryExecution
+                  - athena:GetQueryResults
+                Resource: '*'
+
+  # Lambda Function - API Principal (FastAPI)
+  APILambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'imdb-api-${Stage}'
+      Runtime: python3.11
+      Handler: fase3_ml_imdb.api_collector.lambda_handler.handler
+      Code:
+        ZipFile: |
+          # Placeholder - será substituído por deploy real
+          def handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'body': '{"message": "IMDb API funcionando via CloudFormation!"}'
+              }
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TC_STAGE: !Ref Stage
+          TC_REGION: !Ref 'AWS::Region'
+          TC_S3_RAW: !Ref S3BucketRaw
+          TC_S3_TRUSTED: !Ref S3BucketTrusted
+          TC_S3_REFINED: !Ref S3BucketRefined
+          TC_S3_MODELS: !Ref S3BucketModels
+      Timeout: 30
+      MemorySize: 512
+
+  # Lambda Function - S3 Trigger para Glue
+  S3TriggerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'imdb-s3-trigger-${Stage}'
+      Runtime: python3.11
+      Handler: infrastructure.lambda.s3_trigger_lambda.lambda_handler
+      Code:
+        ZipFile: |
+          # Placeholder - será substituído por deploy real
+          def lambda_handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'body': '{"message": "S3 Trigger funcionando!"}'
+              }
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          TC_STAGE: !Ref Stage
+          TC_REGION: !Ref 'AWS::Region'
+      Timeout: 60
+      MemorySize: 256
+
+  # Lambda Function - ML Predictions
+  PredictLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'imdb-predict-${Stage}'
+      Runtime: python3.11
+      Handler: fase3_ml_imdb.ml_training.predict_lambda.lambda_handler
+      Code:
+        ZipFile: |
+          # Placeholder - será substituído por deploy real
+          def lambda_handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'body': '{"message": "ML Predict funcionando!"}'
+              }
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          MODEL_BUCKET: !Ref S3BucketModels
+          MODEL_KEY: 'models/latest/imdb_rating_predictor.pkl'
+      Timeout: 30
+      MemorySize: 1024
+
+  # API Gateway para expor Lambda como HTTP API
+  APIGateway:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub 'imdb-api-gateway-${Stage}'
+      Description: 'API Gateway for IMDb ML API'
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowCredentials: false
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        AllowOrigins:
+          - '*'
+        AllowHeaders:
+          - '*'
+
+  # Integration entre API Gateway e Lambda
+  APIGatewayIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref APIGateway
+      Description: Lambda Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${APILambdaFunction.Arn}/invocations'
+      PayloadFormatVersion: '2.0'
+
+  # Route catchall para API
+  APIGatewayRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref APIGateway
+      RouteKey: 'ANY /{proxy+}'
+      AuthorizationType: NONE
+      OperationName: ProxyRoute
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref APIGatewayIntegration
+
+  # Permissão para API Gateway invocar Lambda
+  APIGatewayLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref APILambdaFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${APIGateway}/*/*'
+
+  # Stage do API Gateway
+  APIGatewayStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref APIGateway
+      StageName: !Ref Stage
+      Description: !Sub 'Stage ${Stage} for IMDb API'
+      AutoDeploy: true
+
+Outputs:
+  APIEndpoint:
+    Description: 'API Gateway endpoint URL'
+    Value: !Sub 'https://${APIGateway}.execute-api.${AWS::Region}.amazonaws.com/${Stage}'
+    Export:
+      Name: !Sub '${AWS::StackName}-api-url'
+      
+  LambdaFunctionArns:
+    Description: 'Lambda function ARNs'
+    Value: !Sub |
+      API: ${APILambdaFunction.Arn}
+      S3Trigger: ${S3TriggerLambda.Arn}  
+      Predict: ${PredictLambda.Arn}
+    Export:
+      Name: !Sub '${AWS::StackName}-lambda-arns'

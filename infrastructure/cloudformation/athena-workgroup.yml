@@ -1,0 +1,160 @@
+# CloudFormation Template - Athena Workgroup
+# Tech Challenge Fase 3 - Deploy via AWS CLI
+
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IMDb ML API - Athena Workgroup para Tech Challenge Fase 3'
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    Description: Environment stage
+    
+  QueryResultsBucket:
+    Type: String
+    Default: aws-athena-query-results-718942601863-us-east-1-8c1egr1z
+    Description: S3 bucket for Athena query results
+
+Resources:
+  # Athena Workgroup
+  IMDbAthenaWorkgroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: !Sub 'imdb-workgroup-${Stage}'
+      Description: 'Workgroup for IMDb ML queries - Tech Challenge Fase 3'
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub 's3://${QueryResultsBucket}/'
+          EncryptionConfiguration:
+            EncryptionOption: SSE_S3
+        EnforceWorkGroupConfiguration: true
+        BytesScannedCutoffPerQuery: 10737418240  # 10GB limit
+      State: ENABLED
+
+  # Named Query - Exemplo de consulta IMDb ratings
+  SampleRatingsQuery:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Name: !Sub 'sample-ratings-query-${Stage}'
+      Description: 'Sample query for IMDb ratings data'
+      Database: !Sub 'imdb_database_${Stage}'
+      QueryString: |
+        SELECT 
+          tconst,
+          averageRating,
+          numVotes,
+          log_votes,
+          rating_category,
+          is_popular,
+          ingestion_timestamp
+        FROM imdb_ratings_refined
+        WHERE averageRating >= 7.0 
+          AND numVotes >= 1000
+        ORDER BY numVotes DESC
+        LIMIT 100;
+      WorkGroup: !Ref IMDbAthenaWorkgroup
+
+  # Named Query - Top filmes por categoria
+  TopMoviesByCategory:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Name: !Sub 'top-movies-by-category-${Stage}'
+      Description: 'Top movies grouped by rating category'
+      Database: !Sub 'imdb_database_${Stage}'
+      QueryString: |
+        SELECT 
+          rating_category,
+          COUNT(*) as total_movies,
+          AVG(averageRating) as avg_rating,
+          AVG(numVotes) as avg_votes,
+          MAX(averageRating) as max_rating,
+          MIN(averageRating) as min_rating
+        FROM imdb_ratings_refined
+        WHERE averageRating IS NOT NULL
+          AND numVotes >= 10
+        GROUP BY rating_category
+        ORDER BY avg_rating DESC;
+      WorkGroup: !Ref IMDbAthenaWorkgroup
+
+  # Named Query - Identificar oportunidades ML
+  MLOpportunitiesQuery:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Name: !Sub 'ml-opportunities-query-${Stage}'
+      Description: 'Query to identify ML opportunities (high rating, low popularity)'
+      Database: !Sub 'imdb_database_${Stage}'
+      QueryString: |
+        SELECT 
+          tconst,
+          averageRating,
+          numVotes,
+          log_votes,
+          rating_category,
+          ROUND(averageRating / log_votes, 4) as opportunity_ratio,
+          CASE 
+            WHEN averageRating >= 8.0 AND is_popular = 0 THEN 'HIGH'
+            WHEN averageRating >= 7.0 AND is_popular = 0 THEN 'MEDIUM'
+            ELSE 'LOW'
+          END as opportunity_level
+        FROM imdb_ratings_refined
+        WHERE averageRating >= 6.5
+          AND numVotes >= 50
+          AND numVotes <= 10000  -- Não muito popular ainda
+        ORDER BY opportunity_ratio DESC
+        LIMIT 50;
+      WorkGroup: !Ref IMDbAthenaWorkgroup
+
+  # Named Query - Dados para ML training
+  MLTrainingDataQuery:
+    Type: AWS::Athena::NamedQuery
+    Properties:
+      Name: !Sub 'ml-training-data-${Stage}'
+      Description: 'Query to extract data for ML model training'
+      Database: !Sub 'imdb_database_${Stage}'
+      QueryString: |
+        SELECT 
+          averageRating as target_rating,
+          numVotes,
+          log_votes,
+          rating_normalized,
+          CASE rating_category
+            WHEN 'poor' THEN 1
+            WHEN 'fair' THEN 2  
+            WHEN 'good' THEN 3
+            WHEN 'very_good' THEN 4
+            WHEN 'excellent' THEN 5
+            ELSE 0
+          END as rating_category_encoded,
+          is_popular,
+          EXTRACT(year FROM ingestion_timestamp) as ingestion_year,
+          EXTRACT(month FROM ingestion_timestamp) as ingestion_month
+        FROM imdb_ratings_refined
+        WHERE averageRating IS NOT NULL
+          AND numVotes >= 10
+          AND averageRating BETWEEN 1.0 AND 10.0
+        ORDER BY RANDOM()  -- Para sampling aleatório
+        LIMIT 100000;  -- Amostra para desenvolvimento
+      WorkGroup: !Ref IMDbAthenaWorkgroup
+
+Outputs:
+  WorkgroupName:
+    Description: 'Athena workgroup name'
+    Value: !Ref IMDbAthenaWorkgroup
+    Export:
+      Name: !Sub '${AWS::StackName}-workgroup-name'
+      
+  QueryResultsLocation:
+    Description: 'S3 location for Athena query results'
+    Value: !Sub 's3://${QueryResultsBucket}/'
+    Export:
+      Name: !Sub '${AWS::StackName}-results-location'
+      
+  SampleQueries:
+    Description: 'Named queries created'
+    Value: !Sub |
+      Sample Ratings: ${SampleRatingsQuery}
+      Top by Category: ${TopMoviesByCategory}
+      ML Opportunities: ${MLOpportunitiesQuery}
+      ML Training Data: ${MLTrainingDataQuery}
+    Export:
+      Name: !Sub '${AWS::StackName}-sample-queries'
