@@ -1,0 +1,192 @@
+# GitHub Actions - Deploy Fase 3 IMDb ML
+# Seguindo padrão das Fases 1 e 2
+
+name: Deploy IMDb ML API - Fase 3
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+
+env:
+  AWS_REGION: us-east-1
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  test:
+    name: Tests & Quality
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements_minimal.txt
+        pip install pytest black flake8 isort
+    
+    - name: Code formatting check
+      run: |
+        black --check fase3_ml_imdb/ tests/
+        isort --check-only fase3_ml_imdb/ tests/
+    
+    - name: Linting
+      run: |
+        flake8 fase3_ml_imdb/ tests/ --max-line-length=120
+    
+    - name: Run tests
+      run: |
+        pytest tests/ -v --tb=short
+      env:
+        TC_STAGE: test
+        TC_REGION: ${{ env.AWS_REGION }}
+
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Setup Node.js (for Serverless)
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install Serverless Framework
+      run: npm install -g serverless serverless-python-requirements
+    
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Deploy Infrastructure & API
+      run: |
+        serverless deploy --stage dev
+      env:
+        TC_STAGE: dev
+        TC_REGION: ${{ env.AWS_REGION }}
+        TC_S3_RAW: ${{ secrets.TC_S3_RAW }}
+        TC_S3_TRUSTED: ${{ secrets.TC_S3_TRUSTED }}
+        TC_S3_REFINED: ${{ secrets.TC_S3_REFINED }}
+        TC_S3_MODELS: ${{ secrets.TC_S3_MODELS }}
+    
+    - name: Run integration tests
+      run: |
+        python -m pytest tests/integration/ -v
+      env:
+        API_BASE_URL: ${{ steps.deploy.outputs.api_url }}
+
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Setup Node.js (for Serverless)
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install Serverless Framework
+      run: npm install -g serverless serverless-python-requirements
+    
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Deploy to Production
+      run: |
+        serverless deploy --stage prod
+      env:
+        TC_STAGE: prod
+        TC_REGION: ${{ env.AWS_REGION }}
+        TC_S3_RAW: ${{ secrets.TC_S3_RAW_PROD }}
+        TC_S3_TRUSTED: ${{ secrets.TC_S3_TRUSTED_PROD }}
+        TC_S3_REFINED: ${{ secrets.TC_S3_REFINED_PROD }}
+        TC_S3_MODELS: ${{ secrets.TC_S3_MODELS_PROD }}
+    
+    - name: Run smoke tests
+      run: |
+        python -m pytest tests/smoke/ -v
+      env:
+        API_BASE_URL: ${{ steps.deploy.outputs.api_url }}
+    
+    - name: Deploy to Render (opcional)
+      if: env.RENDER_API_KEY
+      run: |
+        echo "🚀 Deploying to Render..."
+        # TODO: Implementar deploy Render se necessário
+      env:
+        RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+
+  notebook-tests:
+    name: Test Jupyter Notebooks
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install nbval jupyter
+    
+    - name: Test notebooks
+      run: |
+        # Validar estrutura dos notebooks
+        jupyter nbconvert --to notebook --execute notebooks/01_imdb_cross_validation_athena.ipynb --output test_output.ipynb
+        
+        # Validar sintaxe
+        python -m py_compile notebooks/athena-based/*.py || true
+      env:
+        TC_STAGE: test

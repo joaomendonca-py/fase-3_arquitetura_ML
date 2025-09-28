@@ -1,0 +1,147 @@
+# Serverless Framework - Tech Challenge Fase 3
+# Seguindo padrão das Fases 1 e 2
+
+service: imdb-ml-api-fase3
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: ${env:TC_REGION, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  
+  environment:
+    TC_STAGE: ${self:provider.stage}
+    TC_REGION: ${self:provider.region}
+    TC_S3_RAW: ${env:TC_S3_RAW}
+    TC_S3_TRUSTED: ${env:TC_S3_TRUSTED}
+    TC_S3_REFINED: ${env:TC_S3_REFINED}
+    TC_S3_MODELS: ${env:TC_S3_MODELS}
+
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:GetObject
+        - s3:PutObject
+        - s3:ListBucket
+      Resource:
+        - "arn:aws:s3:::${env:TC_S3_RAW}/*"
+        - "arn:aws:s3:::${env:TC_S3_TRUSTED}/*"
+        - "arn:aws:s3:::${env:TC_S3_REFINED}/*"
+        - "arn:aws:s3:::${env:TC_S3_MODELS}/*"
+    
+    - Effect: Allow
+      Action:
+        - glue:StartJobRun
+        - glue:GetJobRun
+        - glue:GetJobRuns
+      Resource: "*"
+    
+    - Effect: Allow
+      Action:
+        - athena:StartQueryExecution
+        - athena:GetQueryExecution
+        - athena:GetQueryResults
+      Resource: "*"
+
+functions:
+  # API Principal (FastAPI via Mangum)
+  api:
+    handler: fase3_ml_imdb.api_collector.lambda_handler.handler
+    events:
+      - httpApi:
+          path: /{proxy+}
+          method: ANY
+    timeout: 30
+    
+  # Lambda Trigger S3 → Glue
+  s3TriggerGlue:
+    handler: infrastructure.lambda.s3_trigger_lambda.lambda_handler
+    events:
+      - s3:
+          bucket: ${env:TC_S3_RAW}
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: imdb/
+            - suffix: .tsv.gz
+    timeout: 60
+
+  # Lambda para predições ML
+  predictRating:
+    handler: fase3_ml_imdb.ml_training.predict_lambda.lambda_handler
+    events:
+      - httpApi:
+          path: /v1/imdb/predict
+          method: POST
+    timeout: 30
+    environment:
+      MODEL_BUCKET: ${env:TC_S3_MODELS}
+      MODEL_KEY: "models/latest/imdb_rating_predictor.pkl"
+
+resources:
+  Resources:
+    # Glue Jobs
+    IMDbRatingsETLJob:
+      Type: AWS::Glue::Job
+      Properties:
+        Name: imdb-ratings-etl-job
+        Role: !GetAtt GlueServiceRole.Arn
+        Command:
+          Name: glueetl
+          ScriptLocation: s3://${env:TC_S3_RAW}/scripts/imdb_ratings_etl_job.py
+          PythonVersion: "3"
+        DefaultArguments:
+          "--job-bookmark-option": "job-bookmark-enable"
+          "--enable-metrics": ""
+          "--enable-continuous-cloudwatch-log": ""
+        MaxRetries: 0
+        GlueVersion: "4.0"
+
+    # IAM Role para Glue
+    GlueServiceRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: glue.amazonaws.com
+              Action: sts:AssumeRole
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+        Policies:
+          - PolicyName: S3Access
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - s3:GetObject
+                    - s3:PutObject
+                    - s3:ListBucket
+                  Resource:
+                    - "arn:aws:s3:::${env:TC_S3_RAW}/*"
+                    - "arn:aws:s3:::${env:TC_S3_TRUSTED}/*"
+                    - "arn:aws:s3:::${env:TC_S3_REFINED}/*"
+
+    # Athena Workgroup
+    IMDbAthenaWorkgroup:
+      Type: AWS::Athena::WorkGroup
+      Properties:
+        Name: imdb-workgroup-${self:provider.stage}
+        Description: "Workgroup for IMDb ML queries - Tech Challenge Fase 3"
+        WorkGroupConfiguration:
+          ResultConfiguration:
+            OutputLocation: s3://aws-athena-query-results-718942601863-${self:provider.region}-8c1egr1z/
+          EnforceWorkGroupConfiguration: true
+          PublishCloudWatchMetrics: true
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    layer:
+      name: ${self:service}-requirements
+      description: "Python requirements for IMDb ML API"
