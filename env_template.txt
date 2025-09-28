@@ -1,0 +1,26 @@
+# Tech Challenge - Fase 3 - Variáveis de Ambiente
+# Copie este arquivo para .env e preencha os valores
+
+# Stage/Environment
+TC_STAGE=dev
+
+# AWS Configuration
+TC_REGION=us-east-1
+
+# S3 Buckets (criados)
+TC_S3_RAW=imdb-raw-data-718942601863
+TC_S3_REFINED=imdb-refined-data-718942601863
+TC_S3_MODELS=imdb-ml-models-718942601863
+
+# IMDb Data
+TC_IMDB_LOCAL_DIR=./imdb
+
+# API Configuration
+TC_API_HOST=0.0.0.0
+TC_API_PORT=8000
+
+# ML Model Configuration
+TC_MODEL_PREFIX=fase3/models
+
+# Monitoring
+TC_LOG_LEVEL=INFO
