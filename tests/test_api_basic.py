@@ -3,7 +3,6 @@ Testes básicos para a API IMDb ML
 Tech Challenge Fase 3 - Testes para GitHub Actions
 """
 
-import pytest
 from fastapi.testclient import TestClient
 
 

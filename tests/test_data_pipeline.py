@@ -6,7 +6,6 @@ Tech Challenge Fase 3 - Data Pipeline Tests
 from unittest.mock import Mock, patch
 
 import pandas as pd
-import pytest
 
 
 def test_pandas_import():
@@ -51,7 +50,7 @@ class TestIMDbIngester:
         mock_s3 = Mock()
         mock_boto3.return_value = mock_s3
 
-        ingester = IMDbIngester()
+        IMDbIngester()
         # Como estamos mockando, verificamos se boto3 foi chamado
         mock_boto3.assert_called_with("s3")
 

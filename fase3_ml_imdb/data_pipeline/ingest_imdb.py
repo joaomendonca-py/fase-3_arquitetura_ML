@@ -7,12 +7,11 @@ Seguindo padrão arquitetural das fases anteriores
 """
 
 import gzip
-import json
 import logging
 import os
 from datetime import datetime
-from io import BytesIO, StringIO
-from typing import Dict, List, Optional
+from io import BytesIO
+from typing import Dict, List
 
 import boto3
 import numpy as np
@@ -63,7 +62,6 @@ class IMDbIngester:
             Dict com paths S3 dos arquivos carregados
         """
         uploaded_files = {}
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         for file_type in file_types:
             if file_type not in self.imdb_files:
@@ -77,7 +75,11 @@ class IMDbIngester:
                 continue
 
             # Path no S3-RAW com particionamento por data
-            s3_key = f"imdb/{file_type}/year={datetime.now().year}/month={datetime.now().month:02d}/day={datetime.now().day:02d}/{self.imdb_files[file_type]}"
+            now = datetime.now()
+            s3_key = (
+                f"imdb/{file_type}/year={now.year}/month={now.month:02d}/"
+                f"day={now.day:02d}/{self.imdb_files[file_type]}"
+            )
 
             try:
                 logger.info(f"Uploading {local_file} → s3://{self.bucket_raw}/{s3_key}")
@@ -129,7 +131,11 @@ class IMDbIngester:
                 df_clean = self._clean_data(df, file_type)
 
                 # Salva como Parquet no S3-TRUSTED (dados limpos)
-                s3_key = f"imdb/{file_type}/year={datetime.now().year}/month={datetime.now().month:02d}/day={datetime.now().day:02d}/trusted.parquet"
+                now = datetime.now()
+                s3_key = (
+                    f"imdb/{file_type}/year={now.year}/month={now.month:02d}/"
+                    f"day={now.day:02d}/trusted.parquet"
+                )
 
                 self._save_parquet_to_s3(df_clean, self.bucket_trusted, s3_key)
 
@@ -163,8 +169,7 @@ class IMDbIngester:
             try:
                 logger.info(f"Processando {file_type} TRUSTED → REFINED...")
 
-                # Lê dados TRUSTED do S3
-                s3_key_trusted = f"imdb/{file_type}/year={datetime.now().year}/month={datetime.now().month:02d}/day={datetime.now().day:02d}/trusted.parquet"
+                # Lê dados TRUSTED do S3 (não usado por simplicidade)
 
                 # Por enquanto, para simplicidade, lê do arquivo local e aplica feature engineering
                 local_file = os.path.join(
@@ -180,7 +185,11 @@ class IMDbIngester:
                 df_refined = self._feature_engineering(df_clean, file_type)
 
                 # Salva como Parquet no S3-REFINED (features para ML)
-                s3_key_refined = f"imdb/{file_type}/year={datetime.now().year}/month={datetime.now().month:02d}/day={datetime.now().day:02d}/refined.parquet"
+                now = datetime.now()
+                s3_key_refined = (
+                    f"imdb/{file_type}/year={now.year}/month={now.month:02d}/"
+                    f"day={now.day:02d}/refined.parquet"
+                )
 
                 self._save_parquet_to_s3(
                     df_refined, self.bucket_refined, s3_key_refined

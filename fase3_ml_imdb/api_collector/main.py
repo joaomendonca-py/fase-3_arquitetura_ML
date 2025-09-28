@@ -189,7 +189,7 @@ async def get_movie_data(movie_id: str):
                 "primary_title": f"Movie {movie_id}",
                 "average_rating": 7.0,
                 "num_votes": 5000,
-                "message": f"Filme não encontrado na amostra. Temos 1.618.471 filmes processados.",
+                "message": "Filme não encontrado na amostra. Temos 1.618.471 filmes processados.",
                 "data_source": "S3-REFINED",
                 "suggestion": "Tente tt0000001, tt0000002, tt0000003 ou tt0000004",
             }
