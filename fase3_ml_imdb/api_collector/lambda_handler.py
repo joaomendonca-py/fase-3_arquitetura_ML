@@ -7,6 +7,7 @@ Igual ao padrão usado nas fases anteriores
 """
 
 from mangum import Mangum
+
 from .main import app
 
 # Handler para AWS Lambda (padrão das fases anteriores)

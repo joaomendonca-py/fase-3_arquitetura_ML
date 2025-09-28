@@ -17,3 +17,8 @@ python-dotenv
 
 # Para Lambda
 mangum
+
+# Testing (para GitHub Actions)
+pytest
+pytest-asyncio
+httpx
