@@ -9,6 +9,7 @@ Seguindo padrão arquitetural das fases anteriores
 import os
 import gzip
 import pandas as pd
+import numpy as np
 import boto3
 from typing import List, Dict, Optional
 import logging
@@ -26,7 +27,9 @@ class IMDbIngester:
     
     def __init__(self):
         self.s3_client = boto3.client('s3')
+        # Arquitetura Medalhão completa
         self.bucket_raw = os.getenv('TC_S3_RAW', 'imdb-raw-data-718942601863')
+        self.bucket_trusted = os.getenv('TC_S3_TRUSTED', 'imdb-trusted-data-718942601863')
         self.bucket_refined = os.getenv('TC_S3_REFINED', 'imdb-refined-data-718942601863')
         self.bucket_models = os.getenv('TC_S3_MODELS', 'imdb-ml-models-718942601863')
         self.imdb_local_dir = os.getenv('TC_IMDB_LOCAL_DIR', './imdb')
@@ -105,7 +108,7 @@ class IMDbIngester:
                 continue
                 
             try:
-                logger.info(f"Processando {file_type} para TRUSTED...")
+                logger.info(f"Processando {file_type} RAW → TRUSTED...")
                 
                 # Lê arquivo local (para esta implementação inicial)
                 local_file = os.path.join(self.imdb_local_dir, self.imdb_files[file_type])
@@ -117,16 +120,63 @@ class IMDbIngester:
                 df = self._read_tsv_gz(local_file)
                 df_clean = self._clean_data(df, file_type)
                 
-                # Salva como Parquet no S3-TRUSTED
-                s3_key = f"imdb/{file_type}/year={datetime.now().year}/month={datetime.now().month:02d}/day={datetime.now().day:02d}/data.parquet"
+                # Salva como Parquet no S3-TRUSTED (dados limpos)
+                s3_key = f"imdb/{file_type}/year={datetime.now().year}/month={datetime.now().month:02d}/day={datetime.now().day:02d}/trusted.parquet"
                 
-                self._save_parquet_to_s3(df_clean, self.bucket_refined, s3_key)
+                self._save_parquet_to_s3(df_clean, self.bucket_trusted, s3_key)
                 
                 processed_counts[file_type] = len(df_clean)
-                logger.info(f"✅ {file_type}: {len(df_clean)} registros processados")
+                logger.info(f"✅ TRUSTED {file_type}: {len(df_clean)} registros processados")
                 
             except Exception as e:
-                logger.error(f"❌ Erro processando {file_type}: {str(e)}")
+                logger.error(f"❌ Erro processando {file_type} para TRUSTED: {str(e)}")
+                processed_counts[file_type] = 0
+                
+        return processed_counts
+
+    def process_to_refined(self, file_types: List[str]) -> Dict[str, int]:
+        """
+        Processa dados TRUSTED → REFINED (feature engineering, agregações para ML)
+        
+        Args:
+            file_types: Tipos de arquivo para processar
+            
+        Returns:
+            Dict com contagem de registros processados
+        """
+        processed_counts = {}
+        
+        for file_type in file_types:
+            if file_type not in self.imdb_files:
+                continue
+                
+            try:
+                logger.info(f"Processando {file_type} TRUSTED → REFINED...")
+                
+                # Lê dados TRUSTED do S3
+                s3_key_trusted = f"imdb/{file_type}/year={datetime.now().year}/month={datetime.now().month:02d}/day={datetime.now().day:02d}/trusted.parquet"
+                
+                # Por enquanto, para simplicidade, lê do arquivo local e aplica feature engineering
+                local_file = os.path.join(self.imdb_local_dir, self.imdb_files[file_type])
+                
+                if not os.path.exists(local_file):
+                    continue
+                
+                # Lê, limpa e aplica feature engineering
+                df = self._read_tsv_gz(local_file)
+                df_clean = self._clean_data(df, file_type)
+                df_refined = self._feature_engineering(df_clean, file_type)
+                
+                # Salva como Parquet no S3-REFINED (features para ML)
+                s3_key_refined = f"imdb/{file_type}/year={datetime.now().year}/month={datetime.now().month:02d}/day={datetime.now().day:02d}/refined.parquet"
+                
+                self._save_parquet_to_s3(df_refined, self.bucket_refined, s3_key_refined)
+                
+                processed_counts[file_type] = len(df_refined)
+                logger.info(f"✅ REFINED {file_type}: {len(df_refined)} registros com features ML")
+                
+            except Exception as e:
+                logger.error(f"❌ Erro processando {file_type} para REFINED: {str(e)}")
                 processed_counts[file_type] = 0
                 
         return processed_counts
@@ -177,6 +227,116 @@ class IMDbIngester:
         df_clean['ingestion_timestamp'] = datetime.now()
         
         return df_clean
+
+    def _feature_engineering(self, df: pd.DataFrame, file_type: str) -> pd.DataFrame:
+        """
+        Aplica feature engineering para criar features prontas para ML
+        
+        Args:
+            df: DataFrame limpo da camada TRUSTED
+            file_type: Tipo do arquivo para aplicar features específicas
+            
+        Returns:
+            DataFrame com features para ML
+        """
+        df_features = df.copy()
+        
+        # Feature engineering específico por tipo
+        if file_type == 'basics':
+            # Features para title.basics.tsv.gz
+            df_features = self._create_basics_features(df_features)
+        elif file_type == 'ratings':
+            # Features para title.ratings.tsv.gz
+            df_features = self._create_ratings_features(df_features)
+        elif file_type == 'crew':
+            # Features para title.crew.tsv.gz  
+            df_features = self._create_crew_features(df_features)
+        elif file_type == 'principals':
+            # Features para title.principals.tsv.gz
+            df_features = self._create_principals_features(df_features)
+            
+        return df_features
+    
+    def _create_basics_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Cria features para title.basics - dados básicos dos filmes"""
+        # Feature: idade do filme
+        current_year = datetime.now().year
+        df['film_age'] = current_year - df['startYear'].fillna(current_year)
+        
+        # Feature: tem runtime válido
+        df['has_runtime'] = (~df['runtimeMinutes'].isna()).astype(int)
+        
+        # Feature: número de gêneros
+        df['genre_count'] = df['genres'].fillna('').apply(lambda x: len(x.split(',')) if x != '' else 0)
+        
+        # One-hot encoding para tipos de título mais comuns
+        top_types = ['movie', 'tvSeries', 'short', 'tvMovie', 'documentary']
+        for title_type in top_types:
+            df[f'type_{title_type}'] = (df['titleType'] == title_type).astype(int)
+        
+        # Features categóricas para gêneros principais
+        all_genres = []
+        for genres_str in df['genres'].dropna():
+            if genres_str != '':
+                all_genres.extend(genres_str.split(','))
+        
+        # Top 10 gêneros mais comuns
+        from collections import Counter
+        top_genres = [genre for genre, _ in Counter(all_genres).most_common(10)]
+        
+        for genre in top_genres:
+            df[f'genre_{genre.lower()}'] = df['genres'].fillna('').apply(
+                lambda x: 1 if genre in x else 0
+            )
+        
+        return df
+    
+    def _create_ratings_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Cria features para title.ratings - ratings dos filmes"""
+        # Feature: popularidade baseada em votos (log scale)
+        df['log_votes'] = np.log1p(df['numVotes'])
+        
+        # Feature: categorias de rating
+        df['rating_category'] = pd.cut(
+            df['averageRating'], 
+            bins=[0, 4, 6, 7, 8, 10], 
+            labels=['poor', 'fair', 'good', 'very_good', 'excellent']
+        )
+        
+        # Feature: é filme popular (muitos votos)
+        vote_threshold = df['numVotes'].quantile(0.8)
+        df['is_popular'] = (df['numVotes'] >= vote_threshold).astype(int)
+        
+        # Feature: rating normalizado (0-1)
+        df['rating_normalized'] = (df['averageRating'] - 1) / 9
+        
+        return df
+    
+    def _create_crew_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Cria features para title.crew - equipe dos filmes"""
+        # Feature: número de diretores
+        df['director_count'] = df['directors'].fillna('').apply(
+            lambda x: len([d for d in x.split(',') if d.strip() != '\\N']) if x else 0
+        )
+        
+        # Feature: número de escritores  
+        df['writer_count'] = df['writers'].fillna('').apply(
+            lambda x: len([w for w in x.split(',') if w.strip() != '\\N']) if x else 0
+        )
+        
+        return df
+    
+    def _create_principals_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Cria features para title.principals - atores principais"""
+        # Feature: posição no cast (ordering)
+        df['is_lead_actor'] = (df['ordering'] <= 3).astype(int)
+        
+        # Features para categorias principais
+        main_categories = ['actor', 'actress', 'director', 'writer', 'producer']
+        for category in main_categories:
+            df[f'is_{category}'] = (df['category'] == category).astype(int)
+        
+        return df
     
     def _clean_title_basics(self, df: pd.DataFrame) -> pd.DataFrame:
         """Limpeza específica para title.basics.tsv.gz"""
@@ -236,32 +396,37 @@ class IMDbIngester:
     
     def run_full_pipeline(self, file_types: List[str], force_refresh: bool = False):
         """
-        Executa pipeline completo: Local → RAW → TRUSTED → REFINED
+        Executa pipeline completo: Local → RAW → TRUSTED → REFINED (Arquitetura Medalhão)
         
         Args:
             file_types: Lista de tipos de arquivo para processar
             force_refresh: Se deve reprocessar mesmo se já existir
         """
-        logger.info("🚀 Iniciando pipeline completo IMDb")
+        logger.info("🚀 Iniciando pipeline completo IMDb - Arquitetura Medalhão")
         start_time = datetime.now()
         
         try:
-            # Step 1: Upload para RAW
-            logger.info("📤 Step 1: Upload para S3-RAW")
+            # Step 1: Upload para RAW (dados originais)
+            logger.info("📤 Step 1: Upload para S3-RAW (dados originais)")
             uploaded = self.upload_raw_data(file_types)
             
-            # Step 2: Processo para TRUSTED/REFINED
-            logger.info("🔄 Step 2: Processamento para TRUSTED/REFINED")
-            processed = self.process_to_trusted(file_types)
+            # Step 2: Processamento para TRUSTED (dados limpos)
+            logger.info("🧹 Step 2: Processamento RAW → TRUSTED (limpeza + validação)")
+            trusted_counts = self.process_to_trusted(file_types)
+            
+            # Step 3: Feature Engineering para REFINED (dados para ML)
+            logger.info("🔧 Step 3: Processamento TRUSTED → REFINED (features ML)")
+            refined_counts = self.process_to_refined(file_types)
             
             # Log final
             execution_time = (datetime.now() - start_time).total_seconds()
-            logger.info(f"✅ Pipeline concluído em {execution_time:.2f}s")
-            logger.info(f"Arquivos processados: {list(processed.keys())}")
-            logger.info(f"Total de registros: {sum(processed.values())}")
+            logger.info(f"✅ Pipeline Medalhão concluído em {execution_time:.2f}s")
+            logger.info(f"📁 RAW: {len(uploaded)} arquivos carregados")
+            logger.info(f"🧹 TRUSTED: {sum(trusted_counts.values())} registros limpos")
+            logger.info(f"🔧 REFINED: {sum(refined_counts.values())} registros com features ML")
             
         except Exception as e:
-            logger.error(f"❌ Erro no pipeline: {str(e)}")
+            logger.error(f"❌ Erro no pipeline Medalhão: {str(e)}")
             raise
 
 def main():

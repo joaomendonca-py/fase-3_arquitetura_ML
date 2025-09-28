@@ -7,9 +7,8 @@ TC_STAGE=dev
 # AWS Configuration
 TC_REGION=us-east-1
 
-# S3 Buckets - Arquitetura Medalhão (criados)
+# S3 Buckets (criados)
 TC_S3_RAW=imdb-raw-data-718942601863
-TC_S3_TRUSTED=imdb-trusted-data-718942601863
 TC_S3_REFINED=imdb-refined-data-718942601863
 TC_S3_MODELS=imdb-ml-models-718942601863
 
