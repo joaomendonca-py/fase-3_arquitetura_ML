@@ -84,6 +84,11 @@ jobs:
         aws s3 cp infrastructure/builds/api-lambda.zip s3://${{ secrets.TC_S3_RAW }}/lambda-code/api-lambda.zip
         aws s3 cp infrastructure/builds/s3-trigger-lambda.zip s3://${{ secrets.TC_S3_RAW }}/lambda-code/s3-trigger-lambda.zip
         aws s3 cp infrastructure/glue/imdb_ratings_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_ratings_etl_job.py
+        aws s3 cp infrastructure/glue/imdb_title_akas_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_title_akas_etl_job.py
+        aws s3 cp infrastructure/glue/imdb_title_crew_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_title_crew_etl_job.py
+        aws s3 cp infrastructure/glue/imdb_title_episode_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_title_episode_etl_job.py
+        aws s3 cp infrastructure/glue/imdb_title_principals_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_title_principals_etl_job.py
+        aws s3 cp infrastructure/glue/imdb_name_basics_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_name_basics_etl_job.py
 
     - name: Deploy CloudFormation Stacks
       run: |
@@ -152,6 +157,11 @@ jobs:
         aws s3 cp infrastructure/builds/api-lambda.zip s3://${{ secrets.TC_S3_RAW }}/lambda-code/api-lambda.zip
         aws s3 cp infrastructure/builds/s3-trigger-lambda.zip s3://${{ secrets.TC_S3_RAW }}/lambda-code/s3-trigger-lambda.zip
         aws s3 cp infrastructure/glue/imdb_ratings_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_ratings_etl_job.py
+        aws s3 cp infrastructure/glue/imdb_title_akas_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_title_akas_etl_job.py
+        aws s3 cp infrastructure/glue/imdb_title_crew_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_title_crew_etl_job.py
+        aws s3 cp infrastructure/glue/imdb_title_episode_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_title_episode_etl_job.py
+        aws s3 cp infrastructure/glue/imdb_title_principals_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_title_principals_etl_job.py
+        aws s3 cp infrastructure/glue/imdb_name_basics_etl_job.py s3://${{ secrets.TC_S3_RAW }}/glue-scripts/imdb_name_basics_etl_job.py
 
     - name: Deploy to Production
       run: |

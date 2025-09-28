@@ -118,6 +118,131 @@ Resources:
       Timeout: 120
       Description: 'ETL job for IMDb basics data processing'
 
+  # Glue Job - IMDb Title Akas ETL
+  IMDbTitleAkasETLJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub 'imdb-title-akas-etl-job-${Stage}'
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub 's3://${S3BucketRaw}/glue-scripts/imdb_title_akas_etl_job.py'
+        PythonVersion: '3'
+      DefaultArguments:
+        '--job-bookmark-option': 'job-bookmark-enable'
+        '--enable-metrics': ''
+        '--enable-continuous-cloudwatch-log': ''
+        '--source-bucket': !Ref S3BucketRaw
+        '--target-bucket-trusted': !Ref S3BucketTrusted
+        '--target-bucket-refined': !Ref S3BucketRefined
+        '--database-name': !Ref GlueDatabase
+      MaxRetries: 0
+      GlueVersion: '4.0'
+      WorkerType: G.1X
+      NumberOfWorkers: 3
+      Timeout: 90
+      Description: 'ETL job for IMDb title akas data processing'
+
+  # Glue Job - IMDb Title Crew ETL
+  IMDbTitleCrewETLJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub 'imdb-title-crew-etl-job-${Stage}'
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub 's3://${S3BucketRaw}/glue-scripts/imdb_title_crew_etl_job.py'
+        PythonVersion: '3'
+      DefaultArguments:
+        '--job-bookmark-option': 'job-bookmark-enable'
+        '--enable-metrics': ''
+        '--enable-continuous-cloudwatch-log': ''
+        '--source-bucket': !Ref S3BucketRaw
+        '--target-bucket-trusted': !Ref S3BucketTrusted
+        '--target-bucket-refined': !Ref S3BucketRefined
+        '--database-name': !Ref GlueDatabase
+      MaxRetries: 0
+      GlueVersion: '4.0'
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      Timeout: 60
+      Description: 'ETL job for IMDb title crew data processing'
+
+  # Glue Job - IMDb Title Episode ETL
+  IMDbTitleEpisodeETLJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub 'imdb-title-episode-etl-job-${Stage}'
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub 's3://${S3BucketRaw}/glue-scripts/imdb_title_episode_etl_job.py'
+        PythonVersion: '3'
+      DefaultArguments:
+        '--job-bookmark-option': 'job-bookmark-enable'
+        '--enable-metrics': ''
+        '--enable-continuous-cloudwatch-log': ''
+        '--source-bucket': !Ref S3BucketRaw
+        '--target-bucket-trusted': !Ref S3BucketTrusted
+        '--target-bucket-refined': !Ref S3BucketRefined
+        '--database-name': !Ref GlueDatabase
+      MaxRetries: 0
+      GlueVersion: '4.0'
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      Timeout: 60
+      Description: 'ETL job for IMDb title episode data processing'
+
+  # Glue Job - IMDb Title Principals ETL
+  IMDbTitlePrincipalsETLJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub 'imdb-title-principals-etl-job-${Stage}'
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub 's3://${S3BucketRaw}/glue-scripts/imdb_title_principals_etl_job.py'
+        PythonVersion: '3'
+      DefaultArguments:
+        '--job-bookmark-option': 'job-bookmark-enable'
+        '--enable-metrics': ''
+        '--enable-continuous-cloudwatch-log': ''
+        '--source-bucket': !Ref S3BucketRaw
+        '--target-bucket-trusted': !Ref S3BucketTrusted
+        '--target-bucket-refined': !Ref S3BucketRefined
+        '--database-name': !Ref GlueDatabase
+      MaxRetries: 0
+      GlueVersion: '4.0'
+      WorkerType: G.1X
+      NumberOfWorkers: 4
+      Timeout: 120
+      Description: 'ETL job for IMDb title principals data processing'
+
+  # Glue Job - IMDb Name Basics ETL
+  IMDbNameBasicsETLJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub 'imdb-name-basics-etl-job-${Stage}'
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: glueetl
+        ScriptLocation: !Sub 's3://${S3BucketRaw}/glue-scripts/imdb_name_basics_etl_job.py'
+        PythonVersion: '3'
+      DefaultArguments:
+        '--job-bookmark-option': 'job-bookmark-enable'
+        '--enable-metrics': ''
+        '--enable-continuous-cloudwatch-log': ''
+        '--source-bucket': !Ref S3BucketRaw
+        '--target-bucket-trusted': !Ref S3BucketTrusted
+        '--target-bucket-refined': !Ref S3BucketRefined
+        '--database-name': !Ref GlueDatabase
+      MaxRetries: 0
+      GlueVersion: '4.0'
+      WorkerType: G.1X
+      NumberOfWorkers: 5
+      Timeout: 150
+      Description: 'ETL job for IMDb name basics data processing'
+
   # Glue Crawler para catalogar dados Trusted
   TrustedDataCrawler:
     Type: AWS::Glue::Crawler
@@ -238,6 +363,11 @@ Outputs:
     Value: !Sub |
       Ratings ETL: ${IMDbRatingsETLJob}
       Basics ETL: ${IMDbBasicsETLJob}
+      Title Akas ETL: ${IMDbTitleAkasETLJob}
+      Title Crew ETL: ${IMDbTitleCrewETLJob}
+      Title Episode ETL: ${IMDbTitleEpisodeETLJob}
+      Title Principals ETL: ${IMDbTitlePrincipalsETLJob}
+      Name Basics ETL: ${IMDbNameBasicsETLJob}
     Export:
       Name: !Sub '${AWS::StackName}-job-names'
       
