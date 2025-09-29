@@ -136,7 +136,7 @@ def lambda_handler(event, context):
         }
 
     except Exception as e:
-        logger.error(f"❌ Erro na predição: {str(e)}")
+        logger.error(f" Erro na predição: {str(e)}")
 
         return {
             "statusCode": 500,
@@ -173,14 +173,14 @@ def load_model_from_s3():
             model_cache = model_info
             model_timestamp = last_modified
 
-            logger.info("✅ Modelo carregado e cacheado")
+            logger.info(" Modelo carregado e cacheado")
         else:
-            logger.info("📋 Usando modelo do cache")
+            logger.info(" Usando modelo do cache")
 
         return model_cache
 
     except Exception as e:
-        logger.error(f"❌ Erro ao carregar modelo: {str(e)}")
+        logger.error(f" Erro ao carregar modelo: {str(e)}")
         raise
 
 

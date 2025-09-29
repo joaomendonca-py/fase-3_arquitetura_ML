@@ -92,10 +92,10 @@ class IMDbIngester:
                 )
 
                 uploaded_files[file_type] = f"s3://{self.bucket_raw}/{s3_key}"
-                logger.info(f"✅ Upload concluído: {file_type}")
+                logger.info(f" Upload concluído: {file_type}")
 
             except Exception as e:
-                logger.error(f"❌ Erro no upload {file_type}: {str(e)}")
+                logger.error(f" Erro no upload {file_type}: {str(e)}")
 
         return uploaded_files
 
@@ -141,11 +141,11 @@ class IMDbIngester:
 
                 processed_counts[file_type] = len(df_clean)
                 logger.info(
-                    f"✅ TRUSTED {file_type}: {len(df_clean)} registros processados"
+                    f" TRUSTED {file_type}: {len(df_clean)} registros processados"
                 )
 
             except Exception as e:
-                logger.error(f"❌ Erro processando {file_type} para TRUSTED: {str(e)}")
+                logger.error(f" Erro processando {file_type} para TRUSTED: {str(e)}")
                 processed_counts[file_type] = 0
 
         return processed_counts
@@ -197,11 +197,11 @@ class IMDbIngester:
 
                 processed_counts[file_type] = len(df_refined)
                 logger.info(
-                    f"✅ REFINED {file_type}: {len(df_refined)} registros com features ML"
+                    f" REFINED {file_type}: {len(df_refined)} registros com features ML"
                 )
 
             except Exception as e:
-                logger.error(f"❌ Erro processando {file_type} para REFINED: {str(e)}")
+                logger.error(f" Erro processando {file_type} para REFINED: {str(e)}")
                 processed_counts[file_type] = 0
 
         return processed_counts
@@ -444,16 +444,16 @@ class IMDbIngester:
             file_types: Lista de tipos de arquivo para processar
             force_refresh: Se deve reprocessar mesmo se já existir
         """
-        logger.info("🚀 Iniciando pipeline completo IMDb - Arquitetura Medalhão")
+        logger.info(" Iniciando pipeline completo IMDb - Arquitetura Medalhão")
         start_time = datetime.now()
 
         try:
             # Step 1: Upload para RAW (dados originais)
-            logger.info("📤 Step 1: Upload para S3-RAW (dados originais)")
+            logger.info(" Step 1: Upload para S3-RAW (dados originais)")
             uploaded = self.upload_raw_data(file_types)
 
             # Step 2: Processamento para TRUSTED (dados limpos)
-            logger.info("🧹 Step 2: Processamento RAW → TRUSTED (limpeza + validação)")
+            logger.info(" Step 2: Processamento RAW → TRUSTED (limpeza + validação)")
             trusted_counts = self.process_to_trusted(file_types)
 
             # Step 3: Feature Engineering para REFINED (dados para ML)
@@ -462,15 +462,15 @@ class IMDbIngester:
 
             # Log final
             execution_time = (datetime.now() - start_time).total_seconds()
-            logger.info(f"✅ Pipeline Medalhão concluído em {execution_time:.2f}s")
-            logger.info(f"📁 RAW: {len(uploaded)} arquivos carregados")
-            logger.info(f"🧹 TRUSTED: {sum(trusted_counts.values())} registros limpos")
+            logger.info(f" Pipeline Medalhão concluído em {execution_time:.2f}s")
+            logger.info(f" RAW: {len(uploaded)} arquivos carregados")
+            logger.info(f" TRUSTED: {sum(trusted_counts.values())} registros limpos")
             logger.info(
                 f"🔧 REFINED: {sum(refined_counts.values())} registros com features ML"
             )
 
         except Exception as e:
-            logger.error(f"❌ Erro no pipeline Medalhão: {str(e)}")
+            logger.error(f" Erro no pipeline Medalhão: {str(e)}")
             raise
 
 

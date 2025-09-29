@@ -18,15 +18,21 @@ from pyspark.sql.types import *
 import boto3
 from datetime import datetime
 
-# Parse argumentos do Glue
+# Parse argumentos do Glue - NOMES ÚNICOS PARA EVITAR CONFLITOS
 args = getResolvedOptions(sys.argv, [
     'JOB_NAME',
-    'source-bucket',
-    'source-key', 
-    'file-type',
-    'target-bucket-trusted',
-    'target-bucket-refined'
+    'tc-source-bucket',
+    'tc-source-key',
+    'tc-file-type', 
+    'tc-target-bucket-trusted',
+    'tc-target-bucket-refined',
+    'tc-database-name'
 ])
+
+# Usar valores dos argumentos
+source_bucket = args['tc-source-bucket']
+source_key = args['tc-source-key']
+file_type = args['tc-file-type']
 
 # Setup Spark/Glue
 sc = SparkContext()
@@ -35,18 +41,19 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
-print(f"🚀 Iniciando Glue Job: {args['JOB_NAME']}")
-print(f"📁 Source: s3://{args['source-bucket']}/{args['source-key']}")
-print(f"🎯 Target Trusted: {args['target-bucket-trusted']}")
-print(f"🎯 Target Refined: {args['target-bucket-refined']}")
+print(f" Iniciando Glue Job: {args['JOB_NAME']}")
+print(f" Source: s3://{source_bucket}/{source_key}")
+print(f" Target Trusted: {args['tc-target-bucket-trusted']}")
+print(f" Target Refined: {args['tc-target-bucket-refined']}")
+print(f" File Type: {file_type}")
 
 def process_imdb_ratings():
     """Processa dados IMDb ratings seguindo arquitetura medalhão"""
     
     # STEP 1: Ler dados RAW do S3
-    print("📤 STEP 1: Lendo dados RAW...")
+    print(" STEP 1: Lendo dados RAW...")
     
-    source_path = f"s3://{args['source-bucket']}/{args['source-key']}"
+    source_path = f"s3://{source_bucket}/{source_key}"
     
     # Ler TSV comprimido
     df_raw = spark.read \
@@ -54,22 +61,22 @@ def process_imdb_ratings():
         .option("sep", "\t") \
         .csv(source_path)
     
-    print(f"✅ Dados RAW carregados: {df_raw.count()} registros")
+    print(f" Dados RAW carregados: {df_raw.count()} registros")
     
     # STEP 2: Limpar e validar → TRUSTED
-    print("🧹 STEP 2: Processando RAW → TRUSTED...")
+    print(" STEP 2: Processando RAW → TRUSTED...")
     
     df_trusted = clean_ratings_data(df_raw)
     
     # Salvar TRUSTED
-    trusted_path = f"s3://{args['target-bucket-trusted']}/imdb/{args['file-type']}"
+    trusted_path = f"s3://{args['tc-target-bucket-trusted']}/imdb/{file_type}"
     
     df_trusted.write \
         .mode("overwrite") \
         .partitionBy("ingestion_year", "ingestion_month", "ingestion_day") \
         .parquet(trusted_path)
     
-    print(f"✅ TRUSTED salvo: {trusted_path}")
+    print(f" TRUSTED salvo: {trusted_path}")
     
     # STEP 3: Feature Engineering → REFINED  
     print("🔧 STEP 3: Processando TRUSTED → REFINED...")
@@ -77,21 +84,21 @@ def process_imdb_ratings():
     df_refined = create_ml_features(df_trusted)
     
     # Salvar REFINED
-    refined_path = f"s3://{args['target-bucket-refined']}/imdb/{args['file-type']}"
+    refined_path = f"s3://{args['tc-target-bucket-refined']}/imdb/{file_type}"
     
     df_refined.write \
         .mode("overwrite") \
         .partitionBy("ingestion_year", "ingestion_month", "ingestion_day") \
         .parquet(refined_path)
     
-    print(f"✅ REFINED salvo: {refined_path}")
+    print(f" REFINED salvo: {refined_path}")
     
     # STEP 4: Catalogar no Glue Catalog
-    print("📊 STEP 4: Catalogando tabelas...")
+    print(" STEP 4: Catalogando tabelas...")
     
-    catalog_tables(args['file-type'], trusted_path, refined_path)
+    catalog_tables(file_type, trusted_path, refined_path)
     
-    print("🎉 Glue Job concluído com sucesso!")
+    print(" Glue Job concluído com sucesso!")
 
 def clean_ratings_data(df_raw: DataFrame) -> DataFrame:
     """Limpa e valida dados de ratings"""
@@ -148,7 +155,7 @@ def catalog_tables(file_type: str, trusted_path: str, refined_path: str):
     """Cataloga tabelas no Glue Catalog para acesso via Athena"""
     
     glue_client = boto3.client('glue')
-    database_name = "imdb_database"
+    database_name = args['tc-database-name']
     
     # Criar database se não existir
     try:
@@ -169,7 +176,7 @@ def catalog_tables(file_type: str, trusted_path: str, refined_path: str):
     table_refined = f"imdb_{file_type}_refined"
     create_table_definition(glue_client, database_name, table_refined, refined_path, "refined")
     
-    print(f"📊 Tabelas catalogadas: {table_trusted}, {table_refined}")
+    print(f" Tabelas catalogadas: {table_trusted}, {table_refined}")
 
 def create_table_definition(glue_client, database: str, table: str, location: str, layer: str):
     """Cria definição de tabela no Glue Catalog"""

@@ -4,7 +4,7 @@
 
 set -e
 
-echo "🚀 DEPLOY REAL DA INFRAESTRUTURA - TECH CHALLENGE FASE 3"
+echo " DEPLOY REAL DA INFRAESTRUTURA - TECH CHALLENGE FASE 3"
 echo "========================================================="
 
 # Configurações
@@ -12,7 +12,7 @@ STAGE=${1:-dev}
 REGION=${AWS_DEFAULT_REGION:-us-east-1}
 STACK_PREFIX="imdb-ml-${STAGE}"
 
-echo "📋 Configurações:"
+echo " Configurações:"
 echo "  Stage: ${STAGE}"
 echo "  Region: ${REGION}"
 echo "  Stack Prefix: ${STACK_PREFIX}"
@@ -21,14 +21,14 @@ echo ""
 # Verificar AWS CLI
 echo "🔍 Verificando AWS CLI..."
 if ! command -v aws &> /dev/null; then
-    echo "❌ AWS CLI não encontrado!"
+    echo " AWS CLI não encontrado!"
     exit 1
 fi
 
 # Verificar credenciais AWS
 echo "🔐 Verificando credenciais AWS..."
 aws sts get-caller-identity > /dev/null
-echo "✅ Credenciais AWS OK"
+echo " Credenciais AWS OK"
 
 # Criar diretórios necessários
 mkdir -p infrastructure/builds
@@ -38,7 +38,7 @@ echo ""
 echo "📦 STEP 1: Preparando código das Lambda Functions..."
 
 # Criar ZIP com código da API
-echo "  📁 Empacotando API Lambda..."
+echo "   Empacotando API Lambda..."
 cd ..
 zip -r "fase-3_arquitetura_ML/infrastructure/builds/api-lambda.zip" \
     "fase-3_arquitetura_ML/fase3_ml_imdb/" \
@@ -46,20 +46,20 @@ zip -r "fase-3_arquitetura_ML/infrastructure/builds/api-lambda.zip" \
 cd "fase-3_arquitetura_ML"
 
 # Criar ZIP com código S3 Trigger
-echo "  📁 Empacotando S3 Trigger Lambda..."
+echo "   Empacotando S3 Trigger Lambda..."
 zip -r infrastructure/builds/s3-trigger-lambda.zip \
     infrastructure/lambda/ \
     -x "*.pyc" "*__pycache__*"
 
 # Upload dos códigos para S3 (bucket temporário)
-echo "  📤 Fazendo upload dos ZIPs para S3..."
+echo "   Fazendo upload dos ZIPs para S3..."
 aws s3 cp infrastructure/builds/api-lambda.zip \
     s3://imdb-raw-data-718942601863/lambda-code/api-lambda.zip
 
 aws s3 cp infrastructure/builds/s3-trigger-lambda.zip \
     s3://imdb-raw-data-718942601863/lambda-code/s3-trigger-lambda.zip
 
-echo "✅ Código Lambda preparado e uploaded"
+echo " Código Lambda preparado e uploaded"
 
 # STEP 2: Upload scripts Glue
 echo ""  
@@ -87,7 +87,7 @@ glueContext = GlueContext(sc)
 job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
-print("🚀 IMDb Basics ETL Job - Placeholder funcionando!")
+print(" IMDb Basics ETL Job - Placeholder funcionando!")
 # TODO: Implementar processamento real
 
 job.commit()
@@ -96,14 +96,14 @@ EOF
 aws s3 cp infrastructure/builds/imdb_basics_etl_job.py \
     s3://imdb-raw-data-718942601863/glue-scripts/imdb_basics_etl_job.py
 
-echo "✅ Scripts Glue uploaded"
+echo " Scripts Glue uploaded"
 
 # STEP 3: Deploy CloudFormation Stacks
 echo ""
 echo "☁️ STEP 3: Fazendo deploy dos CloudFormation Stacks..."
 
 # Deploy 1: Glue Jobs & Database
-echo "  📊 Deploy Glue Jobs & Database..."
+echo "   Deploy Glue Jobs & Database..."
 aws cloudformation deploy \
     --template-file infrastructure/cloudformation/glue-jobs.yml \
     --stack-name "${STACK_PREFIX}-glue" \
@@ -115,7 +115,7 @@ aws cloudformation deploy \
     --capabilities CAPABILITY_NAMED_IAM \
     --region ${REGION}
 
-echo "✅ Glue stack deployed"
+echo " Glue stack deployed"
 
 # Deploy 2: Athena Workgroup  
 echo "  🔍 Deploy Athena Workgroup..."
@@ -127,7 +127,7 @@ aws cloudformation deploy \
         QueryResultsBucket=aws-athena-query-results-718942601863-${REGION}-8c1egr1z \
     --region ${REGION}
 
-echo "✅ Athena stack deployed"
+echo " Athena stack deployed"
 
 # Deploy 3: Lambda Functions & API Gateway
 echo "  🔧 Deploy Lambda Functions & API..."
@@ -143,11 +143,11 @@ aws cloudformation deploy \
     --capabilities CAPABILITY_NAMED_IAM \
     --region ${REGION}
 
-echo "✅ Lambda stack deployed"
+echo " Lambda stack deployed"
 
 # STEP 4: Obter outputs
 echo ""
-echo "📋 STEP 4: Obtendo informações dos recursos criados..."
+echo " STEP 4: Obtendo informações dos recursos criados..."
 
 # API URL
 API_URL=$(aws cloudformation describe-stacks \
@@ -198,15 +198,15 @@ TC_S3_MODELS=imdb-ml-models-718942601863
 EOF
 
 echo ""
-echo "🎉 DEPLOY CONCLUÍDO COM SUCESSO!"
+echo " DEPLOY CONCLUÍDO COM SUCESSO!"
 echo "================================"
 echo ""
-echo "📋 RECURSOS CRIADOS:"
+echo " RECURSOS CRIADOS:"
 echo "  🌐 API Endpoint: ${API_URL}"
-echo "  📊 Glue Database: ${DB_NAME}"
+echo "   Glue Database: ${DB_NAME}"
 echo "  🔍 Athena Workgroup: ${WORKGROUP}"
 echo ""
-echo "📁 Configuração salva em: .env.deployed"
+echo " Configuração salva em: .env.deployed"
 echo ""
 echo "🧪 PRÓXIMOS PASSOS:"
 echo "  1. Testar API endpoints"
@@ -214,4 +214,4 @@ echo "  2. Executar Glue Jobs"
 echo "  3. Rodar queries Athena"
 echo "  4. Desenvolver notebooks ML"
 echo ""
-echo "🚀 Infraestrutura pronta para uso!"
+echo " Infraestrutura pronta para uso!"

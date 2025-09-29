@@ -1,0 +1,141 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Tech Challenge Fase 3 - Glue Crawlers para catalogar dados RAW, TRUSTED e REFINED'
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, prod]
+    Description: Deployment stage
+  
+  S3BucketRaw:
+    Type: String
+    Description: S3 bucket for RAW data
+  
+  S3BucketTrusted:
+    Type: String
+    Description: S3 bucket for TRUSTED data
+  
+  S3BucketRefined:
+    Type: String
+    Description: S3 bucket for REFINED data
+
+Resources:
+  # IAM Role para os Crawlers
+  GlueCrawlerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'imdb-glue-crawler-role-${Stage}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: S3Access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub 'arn:aws:s3:::${S3BucketRaw}'
+                  - !Sub 'arn:aws:s3:::${S3BucketRaw}/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketTrusted}'
+                  - !Sub 'arn:aws:s3:::${S3BucketTrusted}/*'
+                  - !Sub 'arn:aws:s3:::${S3BucketRefined}'
+                  - !Sub 'arn:aws:s3:::${S3BucketRefined}/*'
+
+  # Crawler para dados RAW (.tsv.gz)
+  IMDbRawCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub 'imdb-raw-crawler-${Stage}'
+      Role: !GetAtt GlueCrawlerRole.Arn
+      DatabaseName: !Sub 'imdb_database_${Stage}'
+      Description: 'Crawler para catalogar dados RAW do IMDb (.tsv.gz)'
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://${S3BucketRaw}/imdb/raw/'
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: DEPRECATE_IN_DATABASE
+      Configuration: |
+        {
+          "Version": 1.0,
+          "CrawlerOutput": {
+            "Partitions": { "AddOrUpdateBehavior": "InheritFromTable" },
+            "Tables": { "AddOrUpdateBehavior": "MergeNewColumns" }
+          }
+        }
+
+  # Crawler para dados TRUSTED (Parquet)
+  IMDbTrustedCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub 'imdb-trusted-crawler-${Stage}'
+      Role: !GetAtt GlueCrawlerRole.Arn
+      DatabaseName: !Sub 'imdb_database_${Stage}'
+      Description: 'Crawler para catalogar dados TRUSTED do IMDb (Parquet)'
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://${S3BucketTrusted}/imdb/'
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: DEPRECATE_IN_DATABASE
+      Configuration: |
+        {
+          "Version": 1.0,
+          "CrawlerOutput": {
+            "Partitions": { "AddOrUpdateBehavior": "InheritFromTable" },
+            "Tables": { "AddOrUpdateBehavior": "MergeNewColumns" }
+          }
+        }
+
+  # Crawler para dados REFINED (Parquet com Features)
+  IMDbRefinedCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub 'imdb-refined-crawler-${Stage}'
+      Role: !GetAtt GlueCrawlerRole.Arn
+      DatabaseName: !Sub 'imdb_database_${Stage}'
+      Description: 'Crawler para catalogar dados REFINED do IMDb (Parquet com Features ML)'
+      Targets:
+        S3Targets:
+          - Path: !Sub 's3://${S3BucketRefined}/imdb/'
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: DEPRECATE_IN_DATABASE
+      Configuration: |
+        {
+          "Version": 1.0,
+          "CrawlerOutput": {
+            "Partitions": { "AddOrUpdateBehavior": "InheritFromTable" },
+            "Tables": { "AddOrUpdateBehavior": "MergeNewColumns" }
+          }
+        }
+
+Outputs:
+  RawCrawlerName:
+    Description: 'Nome do Crawler RAW'
+    Value: !Ref IMDbRawCrawler
+    Export:
+      Name: !Sub '${AWS::StackName}-RawCrawler'
+  
+  TrustedCrawlerName:
+    Description: 'Nome do Crawler TRUSTED'
+    Value: !Ref IMDbTrustedCrawler
+    Export:
+      Name: !Sub '${AWS::StackName}-TrustedCrawler'
+  
+  RefinedCrawlerName:
+    Description: 'Nome do Crawler REFINED'
+    Value: !Ref IMDbRefinedCrawler
+    Export:
+      Name: !Sub '${AWS::StackName}-RefinedCrawler'

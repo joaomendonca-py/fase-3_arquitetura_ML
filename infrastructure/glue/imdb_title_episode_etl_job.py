@@ -35,16 +35,16 @@ spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
-print(f"🚀 Iniciando Glue Job: {args['JOB_NAME']}")
-print(f"📁 Source: s3://{args['source-bucket']}/{args['source-key']}")
-print(f"🎯 Target Trusted: {args['target-bucket-trusted']}")
-print(f"🎯 Target Refined: {args['target-bucket-refined']}")
+print(f" Iniciando Glue Job: {args['JOB_NAME']}")
+print(f" Source: s3://{args['source-bucket']}/{args['source-key']}")
+print(f" Target Trusted: {args['target-bucket-trusted']}")
+print(f" Target Refined: {args['target-bucket-refined']}")
 
 def process_imdb_title_episode():
     """Processa dados IMDb title episode seguindo arquitetura medalhão"""
     
     # STEP 1: Ler dados RAW do S3
-    print("📤 STEP 1: Lendo dados RAW...")
+    print(" STEP 1: Lendo dados RAW...")
     
     source_path = f"s3://{args['source-bucket']}/{args['source-key']}"
     
@@ -54,10 +54,10 @@ def process_imdb_title_episode():
         .option("sep", "\t") \
         .csv(source_path)
     
-    print(f"✅ Dados RAW carregados: {df_raw.count()} registros")
+    print(f" Dados RAW carregados: {df_raw.count()} registros")
     
     # STEP 2: Limpar e validar → TRUSTED
-    print("🧹 STEP 2: Processando RAW → TRUSTED...")
+    print(" STEP 2: Processando RAW → TRUSTED...")
     
     df_trusted = clean_title_episode_data(df_raw)
     
@@ -69,7 +69,7 @@ def process_imdb_title_episode():
         .partitionBy("ingestion_year", "ingestion_month", "ingestion_day") \
         .parquet(trusted_path)
     
-    print(f"✅ TRUSTED salvo: {trusted_path}")
+    print(f" TRUSTED salvo: {trusted_path}")
     
     # STEP 3: Feature Engineering → REFINED  
     print("🔧 STEP 3: Processando TRUSTED → REFINED...")
@@ -84,14 +84,14 @@ def process_imdb_title_episode():
         .partitionBy("ingestion_year", "ingestion_month", "ingestion_day") \
         .parquet(refined_path)
     
-    print(f"✅ REFINED salvo: {refined_path}")
+    print(f" REFINED salvo: {refined_path}")
     
     # STEP 4: Catalogar no Glue Catalog
-    print("📊 STEP 4: Catalogando tabelas...")
+    print(" STEP 4: Catalogando tabelas...")
     
     catalog_tables(args['file-type'], trusted_path, refined_path)
     
-    print("🎉 Glue Job concluído com sucesso!")
+    print(" Glue Job concluído com sucesso!")
 
 def clean_title_episode_data(df_raw: DataFrame) -> DataFrame:
     """Limpa e valida dados de title episode"""
@@ -189,7 +189,7 @@ def catalog_tables(file_type: str, trusted_path: str, refined_path: str):
     table_refined = f"imdb_{file_type}_refined"
     create_table_definition(glue_client, database_name, table_refined, refined_path, "refined")
     
-    print(f"📊 Tabelas catalogadas: {table_trusted}, {table_refined}")
+    print(f" Tabelas catalogadas: {table_trusted}, {table_refined}")
 
 def create_table_definition(glue_client, database: str, table: str, location: str, layer: str):
     """Cria definição de tabela no Glue Catalog"""

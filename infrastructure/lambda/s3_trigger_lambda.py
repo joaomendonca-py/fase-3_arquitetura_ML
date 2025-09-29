@@ -27,14 +27,14 @@ def lambda_handler(event, context):
     """
     
     try:
-        logger.info(f"🚀 Lambda triggered com evento: {json.dumps(event)}")
+        logger.info(f" Lambda triggered com evento: {json.dumps(event)}")
         
         # Parse S3 event
         for record in event['Records']:
             bucket_name = record['s3']['bucket']['name']
             object_key = record['s3']['object']['key']
             
-            logger.info(f"📁 Processando: s3://{bucket_name}/{object_key}")
+            logger.info(f" Processando: s3://{bucket_name}/{object_key}")
             
             # Determinar tipo de arquivo IMDb
             file_type = _extract_file_type(object_key)
@@ -42,7 +42,7 @@ def lambda_handler(event, context):
             if file_type:
                 # Disparar Glue Job correspondente
                 job_run_id = _trigger_glue_job(file_type, bucket_name, object_key)
-                logger.info(f"✅ Glue Job iniciado: {job_run_id}")
+                logger.info(f" Glue Job iniciado: {job_run_id}")
             else:
                 logger.warning(f"⚠️ Tipo de arquivo não reconhecido: {object_key}")
         
@@ -56,7 +56,7 @@ def lambda_handler(event, context):
         }
         
     except Exception as e:
-        logger.error(f"❌ Erro no Lambda: {str(e)}")
+        logger.error(f" Erro no Lambda: {str(e)}")
         
         return {
             'statusCode': 500,
@@ -109,7 +109,7 @@ def _trigger_glue_job(file_type: str, bucket: str, key: str) -> str:
         return response['JobRunId']
         
     except Exception as e:
-        logger.error(f"❌ Erro ao iniciar Glue Job {job_name}: {str(e)}")
+        logger.error(f" Erro ao iniciar Glue Job {job_name}: {str(e)}")
         raise
 
 # Para testes locais

@@ -15,12 +15,12 @@ help: ## Mostra comandos disponíveis
 
 env: ## Cria ambiente virtual Python
 	python$(PYTHON_VERSION) -m venv $(VENV_NAME)
-	@echo "✅ Ambiente virtual criado. Ative com: source $(VENV_NAME)/bin/activate"
+	@echo "Ambiente virtual criado. Ative com: source $(VENV_NAME)/bin/activate"
 
 install: ## Instala dependências
 	pip install --upgrade pip
 	pip install -r requirements.txt
-	@echo "✅ Dependências instaladas"
+	@echo "OK Dependências instaladas"
 
 # === COLETA DE DADOS ===
 run-api: ## Sobe API de coleta de dados (local)
@@ -54,17 +54,17 @@ clean: ## Remove arquivos temporários
 
 # === DEPLOYMENT ===
 deploy-api: ## Deploy API para AWS Lambda
-	@echo "🚀 Deploy da API para AWS Lambda..."
+	@echo " Deploy da API para AWS Lambda..."
 	# TODO: Implementar script de deploy
 
 deploy-pipeline: ## Deploy pipeline de dados
-	@echo "🚀 Deploy do pipeline de dados..."
+	@echo " Deploy do pipeline de dados..."
 	# TODO: Implementar com Serverless Framework
 
 # === STATUS ===
 status: ## Mostra status do projeto
-	@echo "📊 Status do Projeto:"
+	@echo " Status do Projeto:"
 	@echo "- Python: $(shell python --version)"
-	@echo "- Ambiente: $(shell if [ -d $(VENV_NAME) ]; then echo "✅ Criado"; else echo "❌ Não criado"; fi)"
-	@echo "- AWS CLI: $(shell if command -v aws > /dev/null; then echo "✅ Configurado"; else echo "❌ Não configurado"; fi)"
+	@echo "- Ambiente: $(shell if [ -d $(VENV_NAME) ]; then echo "OK Criado"; else echo "NOK Não criado"; fi)"
+	@echo "- AWS CLI: $(shell if command -v aws > /dev/null; then echo "OK Configurado"; else echo "NOK Não configurado"; fi)"
 	@echo "- Buckets S3: $(shell aws s3 ls | grep imdb | wc -l) criados"

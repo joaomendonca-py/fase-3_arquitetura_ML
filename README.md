@@ -72,6 +72,25 @@ make imdb-train
 
 ---
 
+## Status Atual - Fase 3 - INFRAESTRUTURA COMPLETA
+
+**Pipeline End-to-End Funcionando:**
+- **7 Glue Jobs executados** (ratings, basics, crew, episode, akas, principals, name_basics)
+- **2.6GB dados processados** em S3 Medallion Architecture (RAW → TRUSTED → REFINED)
+- **16 tabelas catalogadas** no AWS Glue Catalog
+- **AWS Athena funcionando** com 1.6M+ registros de ratings + 726K filmes
+- **Jupyter Notebook** pronto para ML conectando diretamente no Athena
+- **GitHub Actions CI/CD** completo (lint, test, deploy CloudFormation)
+- **CloudFormation IaC** para Lambda, Glue, Athena, API Gateway
+- **Query complexa testada**: JOIN entre ratings e basics funcionando
+
+**Próximos passos:**
+1. Executar notebook ML completo (`notebooks/01_imdb_ml_athena.ipynb`)
+2. Deploy do modelo treinado em Lambda
+3. API de predição funcionando
+
+---
+
 ## Dicas rápidas
 - **Custos baixos**: use pandas local para baseline; Glue só para consolidar refinado.
 - **Governança**: padronize partições: `year=YYYY/month=MM/day=DD/` (e `ticker=...` quando aplicável).

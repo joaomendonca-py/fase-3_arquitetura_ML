@@ -15,7 +15,7 @@ glueContext = GlueContext(sc)
 job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
-print("🚀 IMDb Basics ETL Job - Placeholder funcionando!")
+print(" IMDb Basics ETL Job - Placeholder funcionando!")
 # TODO: Implementar processamento real
 
 job.commit()

@@ -82,10 +82,10 @@ Resources:
         '--job-bookmark-option': 'job-bookmark-enable'
         '--enable-metrics': ''
         '--enable-continuous-cloudwatch-log': ''
-        '--source-bucket': !Ref S3BucketRaw
-        '--target-bucket-trusted': !Ref S3BucketTrusted
-        '--target-bucket-refined': !Ref S3BucketRefined
-        '--database-name': !Ref GlueDatabase
+        '--tc-source-bucket': !Ref S3BucketRaw
+        '--tc-target-bucket-trusted': !Ref S3BucketTrusted
+        '--tc-target-bucket-refined': !Ref S3BucketRefined
+        '--tc-database-name': !Ref GlueDatabase
       MaxRetries: 0
       GlueVersion: '4.0'
       WorkerType: G.1X
