@@ -43,6 +43,27 @@ Thumbs.db
 imdb/*.tsv.gz
 data/raw/
 data/processed/
+data/refined/
+
+# Arquivos de backup e temporários
+*_backup.txt
+*_fixed.py
+env_template_backup.txt
+
+# Documentos de planejamento (opcional - manter apenas finais)
+arquitetura_corrigida.md
+plano_implementacao_correta.md
+status_completo.md
+
+# Notebooks antigos/duplicados (manter apenas os principais)
+exercicio_cross_validation.ipynb
+notebooks/01_imdb_ml_local.ipynb
+notebooks/01_imdb_cross_validation_athena.ipynb
+notebooks/01_imdb_ml_athena.ipynb
+notebooks/02_imdb_ml_tech_challenge.ipynb
+
+# Scripts temporários
+download_remaining_data.py
 
 # Logs
 *.log
